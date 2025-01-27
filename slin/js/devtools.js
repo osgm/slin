@@ -77,14 +77,14 @@ async function initDB() {
         };
         
         request.onupgradeneeded = function(event) {
-            const db = event.target.result;
-            if (!db.objectStoreNames.contains("myDataStore")) {
-                db.createObjectStore("myDataStore", {
-                    keyPath: "id",
+                const db = event.target.result;
+                if (!db.objectStoreNames.contains("myDataStore")) {
+                    db.createObjectStore("myDataStore", {
+                        keyPath: "id",
                     autoIncrement: true
-                });
-            }
-        };
+                    });
+                }
+            };
     });
 }
 

@@ -67,7 +67,7 @@ chrome.storage.local.get('ignoreSetArray', function (result) {
             image_checkbox.checked = true;
         } else { image_checkbox.checked = false;}
     
-   
+
     }else{
         js_checkbox.checked = false;
         css_checkbox.checked = false;
@@ -319,9 +319,22 @@ $("#export_har").click((e) => {
 });
 
 //脚本导出
-$("#export_swagger2").click((e) => {
+$("#export_swagger").click((e) => {
     // 使用方法
-    alert("等待开发")
+
+    export_data().then(value => {
+        const name = "测试用例"
+        this.downloadSwagger(name ,value)
+    }).catch(error => {
+        console.error('Error fetching value:', error);
+        alert("导出数据异常！！")
+    });
+
+
+
+
+    
+
 });
 
 //脚本导出
@@ -539,7 +552,7 @@ function get_data(e, getType = null,reps={key:'',value:''}) {
             valueStr = JSON.stringify(cursor.value)
             contentStr=cursor.value.content
             responseStr = JSON.stringify(cursor.value.response)
-            cursor.value.api_name ="未定义接口:"
+            cursor.value.api_name ="未命名接口"
             cursor.value.api_desc =""
             if (searchValue == false) {
                 if(reps.key !='' && reps.value != '' ){
@@ -1486,149 +1499,255 @@ function convertTransactionsJson(name,transactions) {
       return item;
     }
 
-function convertTransactionsPostman(name,transactions) {
-      var  data={}
-      var  info={}
-      info.name=name
-      info._postman_id=this.uuid()
-      info.schema='https://schema.getpostman.com/json/collection/v2.1.0/collection.json'
-      info._exporter_id=this.formattedDate()
-      data.info=info
-      var item=[]
-      var num =1;
+function convertTransactionsPostman(name, transactions) {
+    try {
+        let data = {
+            "info": {
+                "name": name || "Slin Collection",
+                "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+            },
+            "item": []
+        };
 
-      let keys = Object.keys(transactions);
-      keys.forEach(key => {
-            //求获取过滤类型条件
-            if ((dataType != false  && dataType.includes(transactions[key]._resourceType))||dataType ==false) {
-               num=num+1;
-               var array={}
-               var rst={}
-               array.name=name+"_未定义接口_序号"+num
-               num=num+1;
-               console.info(transactions[key])
-               rst.method=transactions[key].request.method
-               rst.header=transactions[key].request.headers
-               Object.keys(rst.header).forEach(k => {
-                    rst.header[k].key= rst.header[k].name
-                    rst.header[k].value= rst.header[k].value
-                    rst.header[k].type='text'
-                    delete rst.header[k].name
-               });
+        let item = [];
+        Object.keys(transactions).forEach(key => {
+            const transaction = transactions[key];
+            if (!transaction || !transaction.request) {
+                console.warn('Invalid transaction:', key);
+                return;
+            }
 
-               rst.body={}
+            let requestData = {
+                "name": transaction.api_name || "未命名接口",
+                "request": {
+                    "method": transaction.request.method || "GET",
+                    "header": [],
+                    "url": {
+                        "raw": transaction.request.url || "",
+                        "protocol": "http",
+                        "host": [],
+                        "path": [],
+                        "query": []
+                    }
+                },
+                "response": []
+            };
 
-               if( transactions[key].request.hasOwnProperty("postData") ){
+            // 处理请求头
+            if (Array.isArray(transaction.request.headers)) {
+                requestData.request.header = transaction.request.headers.map(header => ({
+                    "key": header.name || "",
+                    "value": header.value || "",
+                    "type": "text"
+                }));
+            }
 
-                  if(transactions[key].request.postData.hasOwnProperty("params") && transactions[key].request.postData.mimeType.includes('multipart/form-data') && transactions[key].request.postData.mimeType.includes('boundary=')){
-                    //上传文件处理
-                    rst.body.mode="formdata"
-                    rst.body.formdata=transactions[key].request.postData.params
-                    Object.keys(rst.body.formdata).forEach(k => {
-                           rst.body.formdata[k].key=rst.body.formdata[k].name
-                           delete rst.body.formdata[k].name
-                           rst.body.formdata[k].value=rst.body.formdata[k].value
-                           rst.body.formdata[k].type='file'
-                    });
-
-                  }else if(transactions[key].request.postData.hasOwnProperty("params")){
-
-                    //上传文件处理
-                    rst.body.mode="formdata"
-                    rst.body.formdata=transactions[key].request.postData.params
-                    Object.keys(rst.body.formdata).forEach(k => {
-                           rst.body.formdata[k].key=rst.body.formdata[k].name
-                           delete rst.body.formdata[k].name
-                           rst.body.formdata[k].value=rst.body.formdata[k].value
-                           rst.body.formdata[k].type='default'
-                    });
-                  }else{
-                    rst.body.mode="raw"
-                    rst.body.raw=transactions[key].request.postData.text
-                  }
-               }
-
-                const str = transactions[key].request.url
- 		        var index = str.indexOf(":")
- 		        var resolve = str.substring(0, index);
- 		        console.log(resolve)
- 		        if(resolve==""){ resolve="http"}
-
- 		        // url转变量
- 		        var query =[]
-
- 		        if(transactions[key].request.queryString.length>0){
-                    Object.keys(transactions[key].request.queryString).forEach(k => {
-                       query.push({"key":transactions[key].request.queryString[k].name,"value":transactions[key].request.queryString[k].value})
-                    });
- 		        }
-
- 		        let urlStr=str //.replace(this.getDomain(str),"$$${domain}")
-                rst.url={"raw":urlStr.substring(0, 255),"protocol":resolve,"host":[{"domain":this.getDomain(urlStr),"IP":transactions[key].serverIPAddress}],"query":query}
-                if (withRes === true){
-                                rst.response={}
-                                rst.response.headers=transactions[key].response.headers
-                                rst.response.status=transactions[key].response.status
-                                rst.response.time=transactions[key].response.time
-                                rst.response.content=transactions[key].content
+            // 处理URL
+            try {
+                const urlObj = new URL(transaction.request.url);
+                requestData.request.url.protocol = urlObj.protocol.replace(':', '');
+                requestData.request.url.host = urlObj.hostname.split('.');
+                requestData.request.url.path = urlObj.pathname.split('/').filter(p => p);
+                
+                // 处理查询参数
+                if (Array.isArray(transaction.request.queryString)) {
+                    requestData.request.url.query = transaction.request.queryString.map(param => ({
+                        "key": param.name || "",
+                        "value": param.value || "",
+                        "type": "text"
+                    }));
                 }
-
-                array.request=rst
-
-
-                item.push(array)
-                num=num+1;
-
+            } catch (e) {
+                console.warn('Invalid URL:', transaction.request.url);
             }
-            });
-      data.item=item;
-      return data;
-    }
 
+            // 处理请求体
+            if (transaction.request.postData) {
+                requestData.request.body = {
+                    "mode": "raw",
+                    "raw": ""
+                };
 
-function   convertTransactionsEXCEL(transactions) {
-        var deviceList = [
-                ["*用例名称","用例描述","*请求类型","请求头参数","*请求地址","环境分组","IP变量名","请求体类型","请求体","检查点匹配方式","检查点期望值"]
-                       ]
-        let keys = Object.keys(transactions);
-        keys.forEach(key => {
-        if (!transactions[key].hasOwnProperty("url")) {
-             let name = key.split(" [")[0];
-             let request = [];
-             let traffic = Object.keys(transactions[key]);
-             let num=1;
-             traffic.forEach(index => {
-             let headers=""
-             let hds=transactions[key][index]['headers']
-             hds.forEach(key => {
-                  headers=headers+key['name']+"="+key['value']+"&"
-                      });
-        let array=[]
-        array.push(name)
-        array.push(name+num)
-        array.push(transactions[key][index]['method'])
-        array.push(headers)
-        array.push(transactions[key][index]['url'])
-        array.push("alpha")
-        array.push("")
-        array.push("json")
-        array.push(JSON.stringify(transactions[key][index]['body']))
-        array.push("精确匹配")
-        array.push("success")
-        deviceList.push(array)
-        num=num+1;
-                    })
-            } else {
-                 alert("数据异常，未抓取响应的请求数据")
+                if (transaction.request.postData.text) {
+                    requestData.request.body.raw = transaction.request.postData.text;
+                    
+                    // 设置Content-Type
+                    if (transaction.request.postData.mimeType) {
+                        if (transaction.request.postData.mimeType.includes('json')) {
+                            requestData.request.body.options = {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            };
+                        } else if (transaction.request.postData.mimeType.includes('javascript')) {
+                            requestData.request.body.options = {
+                                "raw": {
+                                    "language": "javascript"
+                                }
+                            };
+                        }
+                    }
+                } else if (Array.isArray(transaction.request.postData.params)) {
+                    requestData.request.body = {
+                        "mode": "formdata",
+                        "formdata": transaction.request.postData.params.map(param => ({
+                            "key": param.name || "",
+                            "value": param.value || "",
+                            "type": "text"
+                        }))
+                    };
+                }
             }
+
+            item.push(requestData);
         });
 
-        var sheet = XLSX.utils.aoa_to_sheet(deviceList);
-        return this.sheet2blob(sheet,name);
+        data.item = item;
+        return data;
+    } catch (error) {
+        console.error('转换Postman数据失败:', error);
+        throw new Error('转换Postman数据失败: ' + error.message);
     }
+}
 
+function downloadPostman(name, transactions) {
+    try {
+        if (!transactions || Object.keys(transactions).length === 0) {
+            Toast("导出失败", "没有可导出的数据");
+            return;
+        }
 
- 
+        const blob = this.convertTransactionsPostman(name, transactions);
+        const fileName = `${name || 'slin_export'}_${this.formattedDate()}.postman_collection.json`;
+        this.download(fileName, JSON.stringify(blob, null, 4));
+        Toast("导出成功", "Postman Collection已导出");
+    } catch (error) {
+        console.error('导出Postman失败:', error);
+        Toast("导出失败", error.message || "导出Postman Collection失败");
+    }
+}
+
+function   convertTransactionsEXCEL(transactions) {
+    try {
+        if (typeof XLSX === 'undefined') {
+            throw new Error('XLSX library is not loaded');
+        }
+
+        // 创建工作簿
+        const wb = XLSX.utils.book_new();
+        
+        // 准备数据
+        const deviceList = [
+            ["*用例名称", "用例描述", "*请求类型", "请求头参数", "*请求地址", "环境分组", "IP变量名", "请求体类型", "请求体", "检查点匹配方式", "检查点期望值"]
+        ];
+
+        // 处理数据
+        for (const key in transactions) {
+            const transaction = transactions[key];
+            if (!transaction || !transaction.request) continue;
+
+            // 处理请求头
+            let headers = "";
+            if (transaction.request.headers && Array.isArray(transaction.request.headers)) {
+                headers = transaction.request.headers
+                    .map(header => `${header.name}=${header.value}`)
+                    .join("\n");
+            }
+
+            // 处理请求体
+            let bodyStr = "";
+            if (transaction.request.postData) {
+                if (transaction.request.postData.text) {
+                    try {
+                        // 尝试格式化JSON
+                        const jsonObj = JSON.parse(transaction.request.postData.text);
+                        bodyStr = JSON.stringify(jsonObj, null, 2);
+                    } catch (e) {
+                        bodyStr = transaction.request.postData.text;
+                    }
+                } else if (transaction.request.postData.params && Array.isArray(transaction.request.postData.params)) {
+                    bodyStr = transaction.request.postData.params
+                        .map(param => `${param.name}=${param.value}`)
+                        .join("\n");
+                }
+            }
+
+            // 构建数据行
+            const row = [
+                transaction.api_name || "未命名接口",           // 用例名称
+                transaction.api_desc || "接口测试",             // 用例描述
+                transaction.request.method || "GET",           // 请求类型
+                headers,                                      // 请求头参数
+                transaction.request.url || "",                // 请求地址
+                "alpha",                                      // 环境分组
+                "",                                          // IP变量名
+                transaction.request.postData?.mimeType || "json", // 请求体类型
+                bodyStr,                                      // 请求体
+                "精确匹配",                                    // 检查点匹配方式
+                "success"                                     // 检查点期望值
+            ];
+            deviceList.push(row);
+        }
+
+        // 创建工作表
+        const ws = XLSX.utils.aoa_to_sheet(deviceList);
+
+        // 设置列宽
+        const wscols = [
+            {wch: 30}, // 用例名称
+            {wch: 30}, // 用例描述
+            {wch: 10}, // 请求类型
+            {wch: 50}, // 请求头参数
+            {wch: 60}, // 请求地址
+            {wch: 15}, // 环境分组
+            {wch: 15}, // IP变量名
+            {wch: 15}, // 请求体类型
+            {wch: 60}, // 请求体
+            {wch: 15}, // 检查点匹配方式
+            {wch: 15}  // 检查点期望值
+        ];
+        ws['!cols'] = wscols;
+
+        // 将工作表添加到工作簿
+        XLSX.utils.book_append_sheet(wb, ws, "Sheet1");
+
+        // 生成Excel文件
+        const wbout = XLSX.write(wb, {
+            bookType: 'xlsx',
+            type: 'array'
+        });
+
+        return wbout;
+    } catch (error) {
+        console.error('转换Excel数据失败:', error);
+        throw error;
+    }
+}
+
+// 下载Excel文件
+function downloadExcel(name, transactions) {
+    try {
+        const excelData = convertTransactionsEXCEL(transactions);
+        if (!excelData) {
+            throw new Error('Excel数据生成失败');
+        }
+
+        const blob = new Blob([excelData], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${name || 'export'}.xlsx`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+        
+        Toast("导出成功", "Excel文件已导出");
+    } catch (error) {
+        console.error('导出Excel失败:', error);
+        Toast("导出失败", error.message || "导出Excel文件失败");
+    }
+}
 
 function download(name, str) {
         let blob = new Blob([str], {type: "application/octet-stream"});
@@ -1646,10 +1765,14 @@ function download(name, str) {
     }
 
 
-function downloadPostman(name, transactions) {
-        let blob=  this.convertTransactionsPostman(name,transactions);
-        this.download(name+'_'+this.formattedDate() + ".json", JSON.stringify(blob, null, 4));
+function downloadSwagger(name, transactions) {
+        exportToSwagger(name, transactions).catch(error => {
+            console.error('导出Swagger失败:', error);
+            Toast("导出失败", error.message);
+        });
     }
+
+
 
 
 function downloadJMX(name, transactions) {
@@ -2144,159 +2267,6 @@ chrome.tabs.onCreated.addListener(function(tab) {
     });
 });
 
-function downloadExcel(name, transactions) {
-    // 创建表头
-    const headers = [
-        "序号",
-        "接口名",
-        "接口描述",
-        "请求时间",
-        "请求方法",
-        "域名",
-        "URL",
-        "状态码",
-        "响应大小",
-        "响应时间(ms)",
-        "类型",
-        "请求头",
-        "请求参数",
-        "请求体",
-        "Cookies"
-    ];
-
-    // 创建数据行
-    const rows = [];
-    rows.push(headers); // 添加表头
-
-    let index = 1;
-    transactions.forEach(transaction => {
-        try {
-            // 检查是否符合当前过滤条件
-            if ((dataType && dataType.includes(transaction._resourceType)) || !dataType) {
-                // 处理请求头
-                let headersStr = '';
-                if (transaction.request && transaction.request.headers) {
-                    headersStr = Object.values(transaction.request.headers)
-                        .map(h => `${h.name}: ${h.value}`)
-                        .join('\n');
-                }
-
-                // 处理请求参数（URL参数）
-                let queryParamsStr = '';
-                if (transaction.request && transaction.request.queryString) {
-                    queryParamsStr = transaction.request.queryString
-                        .map(param => `${param.name}=${param.value}`)
-                        .join('\n');
-                }
-
-                // 处理请求体
-                let requestBodyStr = '';
-                if (transaction.request && transaction.request.postData) {
-                    if (transaction.request.postData.text) {
-                        requestBodyStr = transaction.request.postData.text;
-                    } else if (transaction.request.postData.params) {
-                        requestBodyStr = transaction.request.postData.params
-                            .map(param => `${param.name}=${param.value}`)
-                            .join('\n');
-                    }
-                }
-
-                // 处理Cookies
-                let cookiesStr = '';
-                if (transaction.request && transaction.request.cookies) {
-                    cookiesStr = transaction.request.cookies
-                        .map(cookie => `${cookie.name}=${cookie.value}`)
-                        .join('\n');
-                }
-
-                const row = [
-                    index++,
-                    transaction.api_name || "未定义接口",
-                    transaction.api_desc || "",
-                    get_time(transaction.timestamp),
-                    transaction.request.method,
-                    extractDomain(transaction.request.url),
-                    transaction.request.url,
-                    transaction.response ? transaction.response.status : "",
-                    transaction.response && transaction.response.content ? transaction.response.content.size : 0,
-                    transaction.response ? (transaction.response.time || transaction.time || 0) : 0,
-                    transaction._resourceType || "",
-                    headersStr,
-                    queryParamsStr,
-                    requestBodyStr,
-                    cookiesStr
-                ];
-                rows.push(row);
-            }
-        } catch (error) {
-            console.error('Error processing transaction:', error);
-            // 继续处理下一条数据
-        }
-    });
-
-    // 如果没有数据，显示提示
-    if (rows.length <= 1) {
-        Toast('导出失败', '没有符合条件的数据');
-        return;
-    }
-
-    try {
-        // 创建工作表
-        const ws = XLSX.utils.aoa_to_sheet(rows);
-
-        // 设置列宽
-        const colWidths = [
-            { wch: 8 },  // 序号
-            { wch: 20 }, // 接口名
-            { wch: 30 }, // 接口描述
-            { wch: 20 }, // 请求时间
-            { wch: 10 }, // 请求方法
-            { wch: 25 }, // 域名
-            { wch: 60 }, // URL
-            { wch: 10 }, // 状态码
-            { wch: 12 }, // 响应大小
-            { wch: 15 }, // 响应时间
-            { wch: 12 }, // 类型
-            { wch: 50 }, // 请求头
-            { wch: 40 }, // 请求参数
-            { wch: 50 }, // 请求体
-            { wch: 40 }  // Cookies
-        ];
-        ws['!cols'] = colWidths;
-
-        // 设置单元格自动换行
-        for (let i = 1; i < rows.length; i++) {
-            for (let j = 11; j <= 14; j++) { // 请求头、请求参数、请求体和Cookies列
-                const cellRef = XLSX.utils.encode_cell({r: i, c: j});
-                if (!ws[cellRef]) continue;
-                if (!ws[cellRef].s) ws[cellRef].s = {};
-                ws[cellRef].s.alignment = { wrapText: true, vertical: 'top' };
-            }
-        }
-
-        // 创建工作簿
-        const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, "抓包数据");
-
-        // 生成Excel文件并下载
-        const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
-        const blob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `${name}_${formattedDate()}.xlsx`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-        
-        Toast('导出成功', `已导出 ${rows.length - 1} 条数据`);
-    } catch (error) {
-        console.error('Error generating Excel:', error);
-        Toast('导出失败', '生成Excel文件时发生错误');
-    }
-}
-
 // 添加更新数据库中API名称的函数
 function updateApiName(recordId, newName) {
 
@@ -2383,3 +2353,276 @@ function updateApiDesc(recordId, newDesc) {
         };
     };
 }
+
+// 导出为Swagger格式
+async function exportToSwagger(name, transactions) {
+    try {
+        if (!transactions || Object.keys(transactions).length === 0) {
+            Toast("导出失败", "没有可导出的数据");
+            return;
+        }
+
+        let swaggerDoc = {
+            swagger: "2.0",
+            info: {
+                title: name,
+                description: "API documentation generated by Slin Network Monitor",
+                version: "1.0.0"
+            },
+            host: "",
+            basePath: "/",
+            schemes: ["http", "https"],
+            paths: {},
+            definitions: {}
+        };
+
+        let requestCount = 0;
+        let hasValidEndpoints = false;
+
+        for (const key of Object.keys(transactions)) {
+            const transaction = transactions[key];
+            
+            // 只处理XHR请求
+            if (transaction._resourceType !== 'xhr') {
+                continue;
+            }
+
+            try {
+                // 解析URL
+                let urlObj;
+                try {
+                    urlObj = new URL(transaction.request.url);
+                } catch (e) {
+                    console.warn('Invalid URL:', transaction.request.url);
+                    continue;
+                }
+
+                // 设置host
+                if (!swaggerDoc.host) {
+                    swaggerDoc.host = urlObj.host;
+                }
+
+                // 提取路径参数
+                let path = urlObj.pathname;
+                const pathParams = [];
+                
+                // 改进路径参数提取逻辑
+                path = path.replace(/\/([^\/]+)/g, (match, group) => {
+                    if (/^\d+$/.test(group)) {
+                        const paramName = `param${pathParams.length + 1}`;
+                        pathParams.push({
+                            name: paramName,
+                            in: "path",
+                            required: true,
+                            type: "integer",
+                            description: "Path Parameter"
+                        });
+                        return `/{${paramName}}`;
+                    }
+                    return match;
+                });
+
+                // 处理查询参数
+                const parameters = [...pathParams];
+                if (Array.isArray(transaction.request.queryString)) {
+                    transaction.request.queryString.forEach(param => {
+                        if (param && param.name) {
+                            parameters.push({
+                                name: param.name,
+                                in: "query",
+                                required: false,
+                                type: guessParameterType(param.value),
+                                description: param.value || ""
+                            });
+                        }
+                    });
+                }
+
+                // 处理请求体
+                let requestBody = null;
+                if (transaction.request.postData) {
+                    const contentType = transaction.request.postData.mimeType;
+                    if (contentType) {
+                        try {
+                            if (contentType.includes('application/json')) {
+                                requestBody = transaction.request.postData.text ? 
+                                    JSON.parse(transaction.request.postData.text) : null;
+                            } else if (contentType.includes('form')) {
+                                requestBody = {};
+                                if (Array.isArray(transaction.request.postData.params)) {
+                                    transaction.request.postData.params.forEach(param => {
+                                        if (param && param.name) {
+                                            requestBody[param.name] = param.value || "";
+                                        }
+                                    });
+                                }
+                            }
+                        } catch (e) {
+                            console.warn('Parse request body failed:', e);
+                        }
+                    }
+                }
+
+                // 处理响应
+                let responses = {
+                    "200": {
+                        description: "Success",
+                        schema: {
+                            type: "object"
+                        }
+                    }
+                };
+
+                // 生成响应schema
+                if (transaction.content) {
+                    try {
+                        const responseContent = JSON.parse(transaction.content);
+                        const schemaName = `Response_${++requestCount}`;
+                        responses["200"].schema = {
+                            "$ref": `#/definitions/${schemaName}`
+                        };
+                        swaggerDoc.definitions[schemaName] = generateJsonSchema(responseContent);
+                    } catch (e) {
+                        console.warn('Parse response content failed:', e);
+                        responses["200"].schema = {
+                            type: "string"
+                        };
+                    }
+                }
+
+                // 添加到paths对象
+                if (!swaggerDoc.paths[path]) {
+                    swaggerDoc.paths[path] = {};
+                }
+
+                const method = transaction.request.method.toLowerCase();
+                const operationId = `operation_${requestCount}`;
+                
+                swaggerDoc.paths[path][method] = {
+                    tags: [path.split('/')[1] || 'default'],
+                    summary: transaction.api_name || `${method.toUpperCase()} ${path}`,
+                    description: transaction.api_desc || "",
+                    operationId: operationId,
+                    consumes: [
+                        transaction.request.postData?.mimeType || "application/json"
+                    ],
+                    produces: ["application/json"],
+                    parameters: parameters,
+                    responses: responses
+                };
+
+                // 如果有请求体，添加body参数
+                if (requestBody) {
+                    const requestSchemaName = `Request_${requestCount}`;
+                    swaggerDoc.definitions[requestSchemaName] = generateJsonSchema(requestBody);
+                    swaggerDoc.paths[path][method].parameters.push({
+                        name: "body",
+                        in: "body",
+                        required: true,
+                        description: "Request Body",
+                        schema: {
+                            "$ref": `#/definitions/${requestSchemaName}`
+                        }
+                    });
+                }
+
+                hasValidEndpoints = true;
+            } catch (e) {
+                console.error('Process request failed:', e);
+                continue;
+            }
+        }
+
+        if (!hasValidEndpoints) {
+            Toast("导出失败", "没有找到有效的API端点");
+            return;
+        }
+
+        // 导出swagger文档
+        const blob = new Blob([JSON.stringify(swaggerDoc, null, 2)], {
+            type: 'application/json'
+        });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${name}_swagger_${formattedDate()}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        Toast("导出成功", "Swagger文档已下载");
+    } catch (error) {
+        console.error('导出Swagger失败:', error);
+        Toast("导出失败", error.message);
+    }
+}
+
+// 辅助函数：猜测参数类型
+function guessParameterType(value) {
+    if (value === null || value === undefined) {
+        return "string";
+    }
+    if (typeof value === "number") {
+        return Number.isInteger(value) ? "integer" : "number";
+    }
+    if (typeof value === "boolean") {
+        return "boolean";
+    }
+    // 尝试解析数字字符串
+    if (/^\d+$/.test(value)) {
+        return "integer";
+    }
+    if (/^\d*\.\d+$/.test(value)) {
+        return "number";
+    }
+    return "string";
+}
+
+// 生成JSON Schema
+function generateJsonSchema(obj) {
+    if (Array.isArray(obj)) {
+        return {
+            type: "array",
+            items: obj.length > 0 ? generateJsonSchema(obj[0]) : {type: "object"}
+        };
+    } else if (typeof obj === 'object' && obj !== null) {
+        const properties = {};
+        Object.keys(obj).forEach(key => {
+            properties[key] = generateJsonSchema(obj[key]);
+        });
+        return {
+            type: "object",
+            properties: properties
+        };
+    } else {
+        const type = typeof obj;
+        if (type === 'number') {
+            return {
+                type: Number.isInteger(obj) ? "integer" : "number"
+            };
+        }
+        return {
+            type: type
+        };
+    }
+}
+
+// 修改事件监听器
+$(document).ready(function() {
+    $("#export_swagger").off('click').on('click', function(e) {
+        e.preventDefault();
+        export_data().then(value => {
+            if (!value || Object.keys(value).length === 0) {
+                Toast("导出失败", "没有可导出的数据");
+                return;
+            }
+            const name = "测试用例";
+            exportToSwagger(name, value);
+        }).catch(error => {
+            console.error('导出数据失败:', error);
+            Toast("导出失败", "导出数据异常");
+        });
+    });
+});
+
+ 
