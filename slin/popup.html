@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>抓包工具</title>
+    <meta charset="utf-8"/>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+    <link href="bootstrap/css/bootstrap.min.css" rel="stylesheet"/>
+    <style>
+
+  .notification {
+    top: 0;
+    right: 0;
+    width: 200px;
+    z-index: 1030;
+    display: none;
+    padding: 15px;
+    margin: 10px;
+  }
+  .show {
+    display: block;
+  }
+    </style>
+</head>
+<body>
+<div id="notification" class="notification">抓包需开启开发者工具</div>
+
+<div id="popup" class="container" style="display:block;white-space: nowrap; padding-top: 20%; padding-bottom: 20%">
+    <button type="button" class="btn btn-primary" id="open_background">抓包中心</button>
+</div>
+
+
+</body>
+<script type="text/javascript" src="js/jquery-1.8.3.js"></script>
+<script src="bootstrap/js/bootstrap.min.js"></script>
+<script type="text/javascript" src="js/background.js"></script>
+<script type="text/javascript" src="js/popup.js"></script>
+</html>
+
+
+
+

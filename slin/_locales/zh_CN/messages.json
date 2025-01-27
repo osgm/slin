@@ -1,0 +1,10 @@
+{
+	"pluginDesc": {"message": "浏览器网络抓包插件"},
+	"helloWorld": {"message": "欢迎使用 Slin 网络抓包工具"},
+	"needDevTools": {"message": "抓包需开启开发者工具"},
+	"listening": {"message": "正在监听中..."},
+	"stopped": {"message": "暂停监听中..."},
+	"startRecording": {"message": "开始录制"},
+	"stopRecording": {"message": "停止录制"},
+	"captureCenter": {"message": "抓包中心"}
+}

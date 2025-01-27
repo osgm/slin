@@ -1,0 +1,10 @@
+{
+	"pluginDesc": {"message": "Browser Network Capture Tool"},
+	"helloWorld": {"message": "Welcome to Slin Network Capture Tool"},
+	"needDevTools": {"message": "Please open DevTools to capture network traffic"},
+	"listening": {"message": "Listening..."},
+	"stopped": {"message": "Stopped"},
+	"startRecording": {"message": "Start Recording"},
+	"stopRecording": {"message": "Stop Recording"},
+	"captureCenter": {"message": "Capture Center"}
+}

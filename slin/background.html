@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>抓包中心</title>
+    <meta charset="utf-8"/>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+
+    <link href="../css/page/options.css" type="text/css" rel="stylesheet"/>
+    <link href="js/css/jsoneditor.css" rel="stylesheet" type="text/css">
+    <link href="bootstrap/css/bootstrap.css" rel="stylesheet"/>
+
+    <style>
+        .tooltip-inner {
+            max-width: 800px;
+            white-space: normal;
+            text-align: left;
+            color: white;
+            font-weight: bold;
+            background-color: #f57f17;
+        }
+
+        svg {
+            width: 70px; /* 设置宽度 */
+        }
+
+        .toast-container {
+            position: fixed;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 1051;
+        }
+    </style>
+</head>
+<header id="navbar-example" class="navbar navbar-static">
+    <div class="navbar-inner">
+        <div >
+            <a class="brand" href="#">开发工具抓包</a>
+            <ul class="nav pull-left" role="navigation">
+                <span class="tips" style="color: red;" id="listeningCrawl">正在监听中...    </span>
+                <span class="tips"  style="color: gray;" id="listeningStop">暂停监听中...    </span>
+
+                <button class="btn btn-success btn-primary" data-toggle="popover" data-placement="bottom" title="" data-original-title="Popover on top" id="stop">开始录制</button>
+                <button class="btn btn-normal btn-primary" data-toggle="popover" data-placement="bottom" title="" data-original-title="Popover on top" id="start">停止录制</button>
+            </ul>
+            <ul class="nav pull-right" role="navigation">
+                <li class="dropdown">
+                    <a href="#" id="setting" role="button" class="dropdown-toggle" data-toggle="dropdown">不抓取设置 <b class="caret"></b></a>
+                    <ul class="dropdown-menu" role="menu" id="toolsMenu" aria-labelledby="tools">
+                        <li role="presentation">
+                            <input style=" margin: 11px 0 11px 10px; " type="checkbox" id="css" name="css" value="Bike" checked>
+                            <label for="css">CSS</label><br>
+                        </li>
+                        <li role="presentation">
+                            <input style=" margin: 11px 0 11px 10px; " type="checkbox" id="js" name="js" value="Bike" checked>
+                            <label for="js">JS</label><br>
+                        </li>
+                        <li role="presentation">
+                            <input style=" margin: 11px 0 11px 10px; " type="checkbox" id="doc" name="doc" value="Bike" checked>
+                            <label for="doc">DOC</label><br>
+                        </li>
+                        <li role="presentation">
+                            <input style=" margin: 11px 0 11px 10px; " type="checkbox" id="image" name="image" value="Bike" checked>
+                            <label for="image">IMAGE</label><br>
+                        </li>
+
+                    </ul>
+                </li>
+                <li class="dropdown">
+                    <a href="#" id="setting" role="button" class="dropdown-toggle" data-toggle="dropdown">导出设置 <b class="caret"></b></a>
+                    <ul class="dropdown-menu" role="menu" id="toolsMenu" aria-labelledby="tools">
+                        <li role="presentation">
+                            <input style=" margin: 11px 0 11px 10px; " type="checkbox" id="withRes" name="withRes" value="Bike" checked>
+                            <label for="css">带返回值</label><br>
+                        </li>
+
+                    </ul>
+                </li>
+                <li class="dropdown">
+                    <a id="filterMenuTitle" href="#" role="button" class="dropdown-toggle" data-toggle="dropdown"><span>导出脚本</span> <b class="caret"></b></a>
+                    <ul class="dropdown-menu"  >
+                        <li><a href="#" id="export_json">JSON</a></li>
+                        <li><a href="#" id="export_postman">Postman</a></li>
+                        <li><a href="#" id="export_jmx">JMX</a></li>
+                        <li><a href="#" id="export_excel">Excel</a></li>
+                    </ul>
+                </li>
+                <li class="dropdown">
+                    <a href="#" id="drop2" role="button" class="dropdown-toggle" data-toggle="dropdown">帮助 <b class="caret"></b></a>
+                    <ul class="dropdown-menu" role="menu" aria-labelledby="drop2">
+                        <li role="presentation"><a role="menuitem" tabindex="-1" href="https://github.com/osgm/Slin-chrome-plugin" target="_blank">Slin Help</a></li>
+                        <li role="presentation" class="divider"></li>
+                    </ul>
+                </li>
+            </ul>
+
+        </div>
+    </div>
+</header>
+
+<body>
+
+<!-- 触发按钮 -->
+<div class="toast-container">
+    <!-- Toast Component -->
+    <div class="toast" id="myToast" role="alert" aria-live="assertive" aria-atomic="true">
+        <div class="toast-header">
+            <strong class="mr-auto" id="toastTitle"></strong>
+            <button type="button" class="ml-2 mb-1 close" data-dismiss="toast" aria-label="Close">
+
+            </button>
+        </div>
+        <div class="toast-body" id="toastBody">
+        </div>
+    </div>
+</div>
+<div class="container">
+    <div style="min-height: 50px; padding-top: 10px; display: flex">
+        <div>
+            <span class="badge badge-success">
+                数量:
+                <span id="num"></span>
+            </span>
+        </div>
+        <div style="padding-left: 30px">
+            <button type="button" class="btn btn-outline-dark btn-sm" id="get_Xhr">Xhr</button>
+            <button type="button" class="btn btn-outline-dark btn-sm" id="get_Doc">Doc</button>
+            <button type="button" class="btn btn-outline-dark btn-sm" id="get_Css">Css</button>
+            <button type="button" class="btn btn-outline-dark btn-sm" id="get_Js">Js</button>
+            <button type="button" class="btn btn-outline-dark btn-sm" id="get_Img">Img</button>
+            <button type="button" class="btn btn-outline-dark btn-sm" id="get_Media">Media</button>
+            <button type="button" class="btn btn-outline-dark btn-sm" id="get_Manifest">Manifest</button>
+            <button type="button" class="btn btn-outline-dark btn-sm" id="get_WS">WS</button>
+            <button type="button" class="btn btn-outline-dark btn-sm" id="get_Wasm">Wasm</button>
+            <button type="button" class="btn btn-outline-dark btn-sm" id="get_Other">Other</button>
+            <button type="button" class="btn btn-success btn-primary" id="refresh_data"><i class="bi bi-arrow-clockwise"></i> 刷新</button>
+            <button type="button" class="btn btn-success btn-primary" id="del_data">清除</button>
+            <button type="button" class="btn btn-success btn-primary" id="deleteButton" style="display: none;">删除选中</button>
+        </div>
+    </div>
+</div>
+<div class="container">
+    <div style="min-height: 50px; padding-top: 10px; display: flex">
+        <div>
+            <span class="badge badge-success">
+                变量替换:
+            </span>
+        </div>
+        <div style="padding-left: 30px;" >
+            <input style="width: 500px;"
+                   type="text"
+                   class="form-control"
+                   placeholder="请输入目标值，匹配KV的value值，支持正则，建议先查询确认后再替换"
+                   aria-label="请输入目标值，匹配KV的value值，支持正则，建议先查询确认后再替换"
+                   aria-describedby="basic-addon1"
+                   id="get_from"
+            />
+        </div>
+        <div style="padding-left: 10px"  >
+            <span class="badge badge-success">
+                to
+            </span>
+        </div>
+        <div style="padding-left: 10px">
+            <input style="width: 200px;"
+                   type="text"
+                   class="form-control"
+                   placeholder="变量标识：${变量名}"
+                   aria-label="变量标识：${变量名}"
+                   aria-describedby="basic-addon1"
+                   id="get_to"
+            />
+        </div>
+        <div style="padding-left: 10px ;float: right">
+            <button type="button"  class="btn btn-outline-dark btn-sm"  id="reps">
+                执行替换
+            </button>
+        </div>
+    </div>
+</div>
+<div class="container">
+    <div style="min-height: 50px; padding-top: 10px; display: flex">
+        <div>
+            <span class="badge badge-success">
+                搜索查询:
+            </span>
+        </div>
+        <div style="padding-left: 30px;" >
+            <input
+                    type="text"
+                    class="form-control"
+                    placeholder="请输入查询条件"
+                    aria-label="请输入查询条件"
+                    aria-describedby="basic-addon1"
+                    id="search"
+            />
+        </div>
+        <div style="padding-left: 10px ;float: right">
+            <button type="button"  class="btn btn-outline-dark btn-sm"  id="get_data"  >刷新(正序)</button>
+            <button type="button"  class="btn btn-outline-dark btn-sm" id="get_data_last">刷新(倒序)</button>
+        </div>
+
+    </div>
+
+</div>
+
+<div>
+    <table class="table table-hover table-bordered">
+        <thead class="thead-light">
+        <tr>
+            <th scope="col" style="min-width: 60px">
+                <input type="checkbox" id="selectAll" style="width: 15px;height: 15px">
+            </th>
+            <th scope="col" style="min-width: 60px">序号</th>
+            <th scope="col" style="min-width: 60px">接口名</th>
+            <th scope="col" style="min-width: 120px">接口描述</th>
+            <th scope="col" style="min-width: 90px">时间</th>
+            <th scope="col">版本</th>
+            <th scope="col">请求方法</th>
+            <th scope="col" style="max-width: 50px">host</th>
+            <th scope="col">url</th>
+            <th scope="col">状态</th>
+            <th scope="col">响应大小</th>
+            <th scope="col">响应时长</th>
+            <th scope="col">类型</th>
+        </tr>
+        </thead>
+        <tbody id="tbody" style="font-size: 13px"></tbody>
+    </table>
+</div>
+<!-- Button trigger modal -->
+<div
+        class="modal fade"
+        id="exampleModal"
+        tabindex="-1"
+        aria-labelledby="ModalLabel"
+        aria-hidden="true"
+>
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+            <!--            <div class="modal-header">-->
+            <!--            &lt;!&ndash;头&ndash;&gt;-->
+            <!--            </div>-->
+            <ul class="nav nav-tabs" id="myTab" role="tablist">
+                <li class="nav-item">
+                    <a
+                            class="nav-link active"
+                            id="home-tab"
+                            data-toggle="tab"
+                            href="#Headers"
+                            role="tab"
+                            aria-controls="Headers"
+                            aria-selected="true"
+                    >Headers</a
+                    >
+                </li>
+                <li class="nav-item">
+                    <a
+                            class="nav-link"
+                            id="profile-tab"
+                            data-toggle="tab"
+                            href="#Playload"
+                            role="tab"
+                            aria-controls="profile"
+                            aria-selected="false"
+                    >Playload</a
+                    >
+                </li>
+                <li class="nav-item">
+                    <a
+                            class="nav-link"
+                            id="Preview-tab"
+                            data-toggle="tab"
+                            href="#Preview"
+                            role="tab"
+                            aria-controls="Preview"
+                            aria-selected="false"
+                    >Preview</a
+                    >
+                </li>
+                <li class="nav-item">
+                    <a
+                            class="nav-link"
+                            id="Response-tab"
+                            data-toggle="tab"
+                            href="#Response"
+                            role="tab"
+                            aria-controls="Response"
+                            aria-selected="false"
+                    >Response</a
+                    >
+                </li>
+                <li class="nav-item">
+                    <a
+                            class="nav-link"
+                            id="Action-tab"
+                            data-toggle="tab"
+                            href="#Action"
+                            role="tab"
+                            aria-controls="Action"
+                            aria-selected="false"
+                    >操作</a
+                    >
+                </li>
+
+            </ul>
+            <div class="modal-body">
+                <div class="tab-content" id="myTabContent">
+                    <div
+                            class="tab-pane fade show active"
+                            id="Headers"
+                            role="tabpanel"
+                            aria-labelledby="Headers-tab"
+                    >
+                        <div
+                                id="Generaltoggle"
+                                role="button"
+                                aria-expanded="false"
+                                aria-controls="Generalcollapse"
+                                data-toggle="collapse"
+                                data-target="#Generalcollapse"
+                                style="background-color: rgb(241, 244, 249); height: 30px"
+                        >
+                            <i class="bi bi-caret-right-fill" id="GeneralIcon"></i>
+                            General
+                        </div>
+                        <div class="collapse" id="Generalcollapse">
+                            <div class="card card-body">
+                                <div
+                                        id="GeneralModalBody"
+                                        style="
+                        overflow-x: auto; /* 横向滚动 */
+                        white-space: nowrap; /* 防止内容换行 */
+                        flex-direction: row; /* 子元素横向排列 */
+                        font-size: 15px;
+                        padding-bottom: 2%;
+                      "
+                                ></div>
+                            </div>
+                        </div>
+
+                        <div style="height: 20px"></div>
+                        <div
+                                id="Resonsetoggle"
+                                role="button"
+                                aria-expanded="false"
+                                aria-controls="RespHeaderscollapse"
+                                data-toggle="collapse"
+                                data-target="#RespHeaderscollapse"
+                                style="background-color: #fff176; height: 30px"
+                        >
+                            <i class="bi bi-caret-right-fill" id="ResptoggleIcon"></i>
+                            Response Headers
+                        </div>
+                        <div class="collapse" id="RespHeaderscollapse">
+                            <div class="card card-body">
+                                <div
+                                        id="RespHeadersModalBody"
+                                        style="
+                        overflow-x: auto; /* 横向滚动 */
+                        white-space: nowrap; /* 防止内容换行 */
+                        flex-direction: row;
+                        padding-bottom: 2%;
+                        font-size: 15px;
+                      "
+                                ></div>
+                            </div>
+                        </div>
+
+                        <div style="height: 20px"></div>
+                        <div
+                                id="toggleDiv"
+                                role="button"
+                                aria-expanded="false"
+                                aria-controls="Headerscollapse"
+                                data-toggle="collapse"
+                                data-target="#Headerscollapse"
+                                style="background-color: #00e676; height: 30px"
+                        >
+                            <i class="bi bi-caret-right-fill" id="toggleIcon"></i>
+                            Request Headers
+                        </div>
+                        <div class="collapse" id="Headerscollapse">
+                            <div class="card card-body">
+                                <div
+                                        id="HeadersModalBody"
+                                        style="
+                        overflow-x: auto; /* 横向滚动 */
+                        white-space: nowrap; /* 防止内容换行 */
+                        flex-direction: row;
+                        padding-bottom: 2%;
+                        font-size: 15px;
+                      "
+                                ></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div
+                            class="tab-pane fade"
+                            id="Playload"
+                            role="tabpanel"
+                            aria-labelledby="Playload-tab"
+                    >
+                        <div style="background-color: rgb(241, 244, 249); height: 30px">
+                            <i class="bi bi-p-circle-fill"></i>
+                            Params
+                        </div>
+                        <div class="card card-body">
+                            <div id="ParamsModalBody"></div>
+                        </div>
+                        <div style="height: 20px"></div>
+                        <div style="background-color: rgb(241, 244, 249); height: 30px">
+                            <i class="bi bi-send"></i>
+                            Data
+                        </div>
+                        <div id="DataModalBody" style="height: 600px; padding-bottom: 30px; padding-top: 10px">
+                            <div style="height: 400px;"></div>
+                        </div>
+                    </div>
+                    <div
+                            class="tab-pane fade"
+                            id="Preview"
+                            role="tabpanel"
+                            aria-labelledby="Preview-tab"
+                    >
+                        <div class="card card-body">
+                            <div id="PreviewModalBody" style="height: 500px;">
+                            </div>
+                        </div>
+                    </div>
+                    <div
+                            class="tab-pane fade"
+                            id="Response"
+                            role="tabpanel"
+                            aria-labelledby="Response-tab"
+                    >
+                        <div class="card card-body">
+                            <div id="ResponseModalBody"></div>
+                        </div>
+                    </div>
+                    <div
+                            class="tab-pane fade"
+                            id="Action"
+                            role="tabpanel"
+                            aria-labelledby="Action-tab"
+                    >
+                        <div class="card card-body">
+                            <div id="ActionModalBody"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button
+                        type="button"
+                        class="btn btn-secondary"
+                        data-dismiss="modal"
+                >
+                    关闭
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+<script type="text/javascript" src="js/jquery-1.8.3.js"></script>
+<script type="text/javascript" src="js/js/popper.min.js"></script>
+<script src="bootstrap/js/bootstrap.min.js"></script>
+<script type="text/javascript" src="js/popup.js"></script>
+<script type="text/javascript" src="js/background.js"></script>
+<script type="text/javascript" src="js/JMX.js"></script>
+<script type="text/javascript" src="js/js/jsoneditor.min.js"></script>
+<script type="text/javascript" src="js/xlsx.full.min.js"></script>
+</body>
+</html>
