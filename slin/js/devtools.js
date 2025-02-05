@@ -75,7 +75,7 @@ async function initDB() {
             console.log("数据库连接成功");
             resolve(db);
         };
-        
+
         request.onupgradeneeded = function(event) {
                 const db = event.target.result;
                 if (!db.objectStoreNames.contains("myDataStore")) {
@@ -98,26 +98,40 @@ async function saveToIndexedDB(data) {
         // 检查是否应该过滤掉这个请求
         if (Array.isArray(ignoreSetArray) && ignoreSetArray.length > 0) {
             const resourceType = data._resourceType;
-            
-            // 检查是否需要过滤
-            const shouldFilter = ignoreSetArray.some(type => {
-
-                if (type== resourceType){
-                    return true
-                }
-   
-            });
-            console.log('已过滤111请求:', shouldFilter);
+            const shouldFilter = ignoreSetArray.some(type => type == resourceType);
             if (shouldFilter) {
                 console.log('已过滤请求:', resourceType);
                 return;
             }
         }
 
+        // 处理请求数据，确保正确的字符编码
+        const processedData = {
+            ...data,
+            api_name: "",
+            api_desc: "",
+            content: data.content ? data.content : "",
+            request: {
+                ...data.request,
+                headers: data.request.headers.map(header => ({
+                    name: decodeURIComponent(encodeURIComponent(header.name)),
+                    value: decodeURIComponent(encodeURIComponent(header.value))
+                })),
+                url: data.request.url || ""
+            },
+            response: {
+                ...data.response,
+                headers: data.response.headers.map(header => ({
+                    name: decodeURIComponent(encodeURIComponent(header.name)),
+                    value: decodeURIComponent(encodeURIComponent(header.value))
+                }))
+            }
+        };
+
         const transaction = db.transaction(["myDataStore"], "readwrite");
         const store = transaction.objectStore("myDataStore");
-        await store.add(data);
-        console.log('数据已保存到 IndexedDB:', data._resourceType);
+        await store.add(processedData);
+        console.log('数据已保存到 IndexedDB:', processedData._resourceType);
     } catch (error) {
         console.error('保存数据失败:', error);
     }
@@ -178,9 +192,8 @@ async function initNetworkListener() {
                     },
                     content: content,
                     _resourceType: resourceType,
-                    timestamp: timestamp.toString(),
-                    api_name: "未定义接口",
-                    api_desc: ""
+                    timestamp: timestamp.toString()
+        
                 };
                 
                 // 排除扩展自身的请求

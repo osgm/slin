@@ -515,13 +515,14 @@ function findJsonPaths(jsonObj, targetValue, basePath = [], paths = []) {
 
 var mark =[];      //提取参数标记[{name:变量名,value:对应的id}] 统一id可能对应多个变量名，但变量名是唯一的
 var paramsList =[];  //变量池子
-function get_data(e, getType = null,reps={key:'',value:''}) {
+function get_data(e, getType = null, reps = {key: '', value: ''}) {
     lc = 0;
     var numElement = document.getElementById("num");
     numElement.innerHTML = 0;
-    var searchValue = search()
-    let tbody = document.getElementById("tbody"); // 获取表格的tbody元素
+    var searchValue = search();
+    let tbody = document.getElementById("tbody");
     tbody.innerHTML = "";
+
     const request = indexedDB.open("myDatabase", db_version);
     request.onupgradeneeded = function (event) {
         const db = event.target.result;
@@ -543,172 +544,227 @@ function get_data(e, getType = null,reps={key:'',value:''}) {
         } else {
             cursorRequest = store.openCursor(null, "prev");
         }
+
         cursorRequest.onsuccess = function (event) {
             const cursor = event.target.result;
             if (cursor) {
-            //替换变量更新数据
-            //替换所有的请求内容的变量
-            //从返回值按顺序查，如果找到了，标记接口并替换
-            valueStr = JSON.stringify(cursor.value)
-            contentStr=cursor.value.content
-            responseStr = JSON.stringify(cursor.value.response)
-            cursor.value.api_name ="未命名接口"
-            cursor.value.api_desc =""
-            if (searchValue == false) {
-                if(reps.key !='' && reps.value != '' ){
-                    if(responseStr !="" && responseStr != undefined ){
-                        if(responseStr.includes(reps.key) && !paramsList.includes(reps.value)){
-                            cursor.value.api_name ="参数提取接口:"
-                            if(cursor.value._resourceType =='xhr'){
-                                let jsonpath=findJsonPaths(JSON.parse(contentStr),reps.key)
-                                cursor.value.api_desc =cursor.value.api_desc +"参数提取："+reps.value.toString()+"|"+jsonpath.toString()
-                                mark.push={name:reps.value,value:cursor.id};
-                                paramsList.push(reps.value)
-                              }
-                            }
+                try {
+                    // 处理数据，确保正确的字符编码
+                    const data = cursor.value;
+                    
+                    // 解码中文字符
+                    if (data.api_name) {
+                        data.api_name = decodeURIComponent(encodeURIComponent(data.api_name));
                     }
-                    if(contentStr !="" && contentStr != undefined && contentStr != [] && contentStr.length>0){
-                        if(contentStr.includes(reps.key)  && !paramsList.includes(reps.value)){
-                            cursor.value.api_name ="参数提取接口:"
-                            if(cursor.value._resourceType =='xhr'){
-                                let jsonpath=findJsonPaths(JSON.parse(contentStr),reps.key)
-                                cursor.value.api_desc =cursor.value.api_desc +"参数提取："+reps.value.toString()+"|"+jsonpath.toString()
-                                mark.push={name:reps.value,value:cursor.id};
-                                paramsList.push(reps.value)
-                              }
-                        }
+                    if (data.api_desc) {
+                        data.api_desc = decodeURIComponent(encodeURIComponent(data.api_desc));
                     }
 
-                    Object.keys(cursor.value.request.headers).forEach(key => {
-                        cursor.value.request.headers[key].value=cursor.value.request.headers[key].value.replace(reps.key,reps.value).toString()
-                    })
+                    // 处理请求头和响应头的编码
+                    if (data.request && data.request.headers) {
+                        data.request.headers = data.request.headers.map(header => ({
+                            name: decodeURIComponent(encodeURIComponent(header.name)),
+                            value: decodeURIComponent(encodeURIComponent(header.value))
+                        }));
+                    }
+                    if (data.response && data.response.headers) {
+                        data.response.headers = data.response.headers.map(header => ({
+                            name: decodeURIComponent(encodeURIComponent(header.name)),
+                            value: decodeURIComponent(encodeURIComponent(header.value))
+                        }));
+                    }
 
-                    Object.keys(cursor.value.request.queryString).forEach(key => {
-                        cursor.value.request.queryString[key].value=cursor.value.request.queryString[key].value.replace(reps.key,reps.value).toString()
-                    })
-                    if( cursor.value.request.hasOwnProperty("postData") ){
-                        if(cursor.value.request.postData.mimeType.includes('multipart/form-data')){
-                            Object.keys(cursor.value.request.postData.params).forEach(key => {
-                                cursor.value.request.postData.params[key].value=cursor.value.request.postData.params[key].value.replace(reps.key,reps.value).toString()
-                            })
-                    }else{
-                        cursor.value.request.postData.text =cursor.value.request.postData.text.replace(reps.key,reps.value).toString()
+                    // 更新数据
+                    cursor.value = data;
+                    store.put( cursor.value)
+                    
+                    const valueStr = JSON.stringify(data);
+                    const contentStr = data.content || "";
+                    const responseStr = JSON.stringify(data.response);
+
+                    if (searchValue && !valueStr.includes(searchValue)) {
+                        cursor.continue();
+                        return;
                     }
+
+                    if (reps.key && reps.value) {
+                        handleReplacement(cursor, data, reps, store);
                     }
-                    cursor.value.request.url=cursor.value.request.url.replace(reps.key,reps.value).toString()
-                    store.put(cursor.value)
-            }
-                //console.info(cursor.value)
-                make_data(cursor, getType)
-            } else {
-                if (valueStr.includes(searchValue)) {
-                    //console.info(cursor.value)
-                    make_data(cursor, getType)
-                } else {
-                    }
+
+                    make_data(cursor, getType);
+                    cursor.continue();
+                } catch (error) {
+                    console.error('处理数据时出错:', error);
+                    cursor.continue();
                 }
-            cursor.continue();
             } else {
-                // 所有记录都已处理完毕
-                //console.log("没有更多数据了！");
                 const uniqueArray = [...new Set(typeMap)];
-                //console.log(uniqueArray);
+                console.log('处理完成，类型统计:', uniqueArray);
             }
-
         };
 
         cursorRequest.onerror = function (event) {
-            console.error("读取数据时发生错误:", event.target.errorCode);
+            console.error("读取数据时发生错误:", event.target.error);
         };
     };
 
     request.onerror = function (event) {
-        console.error("打开IndexedDB时发生错误:", event.target.errorCode);
+        console.error("打开IndexedDB时发生错误:", event.target.error);
     };
+}
+
+// 处理变量替换的辅助函数
+function handleReplacement(cursor, data, reps, store) {
+    let needsUpdate = false;
+
+    if (data.content && data.content.includes(reps.key) && !paramsList.includes(reps.value)) {
+        if (data._resourceType === 'xhr') {
+            try {
+                const jsonpath = findJsonPaths(JSON.parse(data.content), reps.key);
+                data.api_name = "参数提取接口:";
+                data.api_desc = (data.api_desc || "") + "参数提取：" + reps.value + "|" + jsonpath;
+                mark.push({name: reps.value, value: cursor.id});
+                paramsList.push(reps.value);
+                needsUpdate = true;
+            } catch (e) {
+                console.warn('JSON解析失败:', e);
+            }
+        }
+    }
+
+    // 更新数据
+    if (needsUpdate) {
+        cursor.update(data);
+    }
 }
 
 let typeMap = [];
 
 function make_data(cursor, getType) {
-    if (getType) {
-        if (!(getType.includes(cursor.value._resourceType))) {
-            return
+    try {
+        if (getType && !getType.includes(cursor.value._resourceType)) {
+            return;
         }
+
+        const transaction = cursor.value;
+        const row = tbody.insertRow();
+
+        // 创建复选框单元格
+        const checkboxCell = row.insertCell();
+        checkboxCell.innerHTML = `<input style="width: 15px;height: 15px" type="checkbox" class="select-checkbox" pid="${transaction.id}">`;
+        checkboxCell.style.cursor = 'pointer';
+
+        // 序号单元格
+        row.insertCell().innerHTML = `<td style="width: 10px;">${lc}</td>`;
+
+        // API名称单元格
+        const apiNameCell = row.insertCell();
+        apiNameCell.innerHTML = `<td style="width: 10px;" class="editable-cell" data-id="${transaction.id}">${escapeHtml(transaction.api_name || "未命名接口")}</td>`;
+        apiNameCell.style.cursor = 'text';
+        setupEditableCell(apiNameCell, 'api_name');
+
+        // API描述单元格
+        const apiDescCell = row.insertCell();
+        apiDescCell.innerHTML = `<td style="width: 10px;" class="editable-cell" data-id="${transaction.id}">${escapeHtml(transaction.api_desc || "接口描述")}</td>`;
+        apiDescCell.style.cursor = 'text';
+        setupEditableCell(apiDescCell, 'api_desc');
+
+        // 时间单元格
+        row.insertCell().innerHTML = `<td><div style="width: 50px">${get_time(transaction.timestamp)}</div></td>`;
+
+        // HTTP版本单元格
+        row.insertCell().innerHTML = `<td><div style="width: 50px">${transaction.request.httpVersion}</div></td>`;
+
+        // 请求方法单元格
+        row.insertCell().textContent = transaction.request.method;
+
+        // 域名单元格
+        docDomain(row, extractDomain(transaction.request.url));
+
+        // URL单元格
+        urlParse(transaction.request.url, transaction._resourceType, row, cursor);
+
+        // 状态码单元格
+        row.insertCell().innerHTML = `<td>${transaction.response.status}</td>`;
+
+        // 响应大小单元格
+        row.insertCell().textContent = transaction.response.content.size;
+
+        // 响应时长单元格
+        const responseTime = transaction.response.time || transaction.time || 0;
+        const timeCell = row.insertCell();
+        timeCell.innerHTML = `<td style="text-align: right;">${responseTime} ms</td>`;
+        timeCell.style.color = responseTime > 1000 ? '#ff4444' : (responseTime > 500 ? '#ffa700' : '#00C851');
+
+        // 资源类型单元格
+        if (transaction._resourceType === "image" && transaction.content) {
+            const imgCell = row.insertCell();
+            if (transaction.content.startsWith('<?xml')) {
+                imgCell.innerHTML = `<div style="max-width: 80px;">${escapeHtml(transaction.content)}</div>`;
+            } else {
+                imgCell.innerHTML = `<div style="max-width: 80px;"><img style="max-width: 80px; max-height: 100px;" src="data:image/png;base64,${transaction.content}" alt="Base64 Image"></div>`;
+            }
+        } else {
+            row.insertCell().textContent = transaction._resourceType;
+        }
+
+        // 更新计数器
+        lc = lc + 1;
+        var numElement = document.getElementById("num");
+        numElement.innerHTML = lc;
+
+        // 初始化tooltip
+        $(function () {
+            $('[data-toggle="tooltip"]').tooltip({
+                container: "body",
+                height: 100,
+            });
+        });
+    } catch (error) {
+        console.error('显示数据时出错:', error);
     }
-    const row = tbody.insertRow();
+}
 
-    // 创建复选框单元格
-    const checkboxCell = row.insertCell();
-    checkboxCell.innerHTML = `<input style="width: 15px;height: 15px" type="checkbox" class="select-checkbox" pid="${cursor.value.id}">`;
-    checkboxCell.style.cursor = 'pointer';
+// 辅助函数：HTML转义
+function escapeHtml(unsafe) {
+    if (!unsafe) return '';
+    return unsafe
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+}
 
-    // 为整行添加点击事件处理
-    row.style.cursor = 'pointer';  // 添加手型光标样式
-    row.addEventListener('click', function(e) {
-        // 如果点击的是复选框本身，让浏览器处理默认行为
-        if (e.target.type === 'checkbox') {
-            return;
-        }
-        
-        // 获取点击的单元格
-        const clickedCell = e.target.closest('td');
-        
-        // 如果点击的是URL单元格（带有tooltip的单元格），不处理复选框
-        if (clickedCell && (clickedCell.querySelector('[data-toggle="tooltip"]') || e.target.hasAttribute('data-toggle'))) {
-            return;
-        }
-        
-        // 切换复选框状态
-        const checkbox = this.querySelector('.select-checkbox');
-        if (checkbox) {
-            checkbox.checked = !checkbox.checked;
-            // 触发change事件以更新全选框状态和删除按钮显示
-            checkbox.dispatchEvent(new Event('change'));
-        }
-    });
-
-    row.insertCell().innerHTML = `<td style="width: 10px;">${lc}</td>`;
-    
-    // 创建可编辑的接口名单元格
-    const apiNameCell = row.insertCell();
- 
- 
-    apiNameCell.innerHTML = `<td style="width: 10px;" class="editable-cell" data-id="${cursor.value.id}">${cursor.value.api_name}</td>`;
-    apiNameCell.style.cursor = 'text';
-
-    
-    // 添加双击事件监听器
-    apiNameCell.addEventListener('dblclick', function(e) {
-        console.log(e.target)
-        const cell = e.target;
+// 设置可编辑单元格
+function setupEditableCell(cell, fieldName) {
+    cell.addEventListener('dblclick', function(e) {
         const originalText = cell.textContent;
-        //const recordId = cell.getAttribute('data-id');
+        const recordId = cell.getAttribute('data-id');
         
-        // 创建输入框
         const input = document.createElement('input');
         input.type = 'text';
         input.value = originalText;
         input.style.width = '100%';
         input.style.height = '100%';
-        input.style.border = '1px solid #4dabf7'; // 添加浅蓝色边框
-        input.style.borderRadius = '3px'; // 添加圆角使其更美观
+        input.style.border = '1px solid #4dabf7';
+        input.style.borderRadius = '3px';
         input.style.padding = '2px';
         input.style.boxSizing = 'border-box';
-        input.style.outline = 'none'; // 移除默认的focus轮廓
+        input.style.outline = 'none';
         
-        // 替换单元格内容为输入框
         cell.textContent = '';
         cell.appendChild(input);
         input.focus();
         
-        // 处理输入框失去焦点和按下回车的情况
         function handleEdit() {
             const newValue = input.value.trim();
             cell.textContent = newValue;
-            recordId=0 
-            console.log(recordId)
-            // 更新数据库中的值
-            updateApiName(recordId, newValue);
+            if (fieldName === 'api_name') {
+                updateApiName(recordId, newValue);
+            } else if (fieldName === 'api_desc') {
+                updateApiDesc(recordId, newValue);
+            }
         }
         
         input.addEventListener('blur', handleEdit);
@@ -717,103 +773,6 @@ function make_data(cursor, getType) {
                 e.preventDefault();
                 handleEdit();
             }
-        });
-    });
-
-    // 创建可编辑的接口描述单元格
-    const apiDescCell = row.insertCell();
-    apiDescCell.innerHTML = `<td style="width: 10px;" class="editable-cell" data-id="${cursor.value.id}">${cursor.value.api_desc}</td>`;
-    apiDescCell.style.cursor = 'text';
-    
-    // 添加双击事件监听器
-    apiDescCell.addEventListener('dblclick', function(e) {
-        const cell = e.target;
-        const originalText = cell.textContent;
-        const recordId = cell.getAttribute('data-id');
-
-        console.log(recordId)
-        
-        // 创建输入框
-        const input = document.createElement('input');
-        input.type = 'text';
-        input.value = originalText;
-        input.style.width = '100%';
-        input.style.height = '100%';
-        input.style.border = '1px solid #4dabf7'; // 添加浅蓝色边框
-        input.style.borderRadius = '3px'; // 添加圆角使其更美观
-        input.style.padding = '2px';
-        input.style.boxSizing = 'border-box';
-        input.style.outline = 'none'; // 移除默认的focus轮廓
-        
-        // 替换单元格内容为输入框
-        cell.textContent = '';
-        cell.appendChild(input);
-        input.focus();
-        
-        // 处理输入框失去焦点和按下回车的情况
-        function handleEdit() {
-            const newValue = input.value.trim();
-            cell.textContent = newValue;
-
-         
-            console.log(cursor.value.id )
-            // 更新数据库中的值
-            updateApiDesc(recordId, newValue);
-        }
-        
-        input.addEventListener('blur', handleEdit);
-        input.addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                handleEdit(recordId);
-            }
-        });
-    });
-
-    row.insertCell().innerHTML = `<td><div style="width: 50px">
-${get_time(cursor.value.timestamp)}
-</div></td>`;
-    row.insertCell().innerHTML = `<td><div style="width: 50px">${cursor.value.request.httpVersion}</div></td>`;
-    row.insertCell().textContent = cursor.value.request.method;
-    docDomain(row, extractDomain(cursor.value.request.url))
-    urlParse(cursor.value.request.url, cursor.value._resourceType, row, cursor);
-    row.insertCell().innerHTML = `<td>${cursor.value.response.status}</td>`;
-    row.insertCell().textContent = cursor.value.response.content.size;
-    
-    // 添加响应时长列
-    const responseTime =  cursor.value.response.time ||cursor.value.time || 0;
-    const timeCell = row.insertCell();
-    timeCell.innerHTML = `<td style="text-align: right;">${responseTime} ms</td>`;
-    timeCell.style.color = responseTime > 1000 ? '#ff4444' : (responseTime > 500 ? '#ffa700' : '#00C851');
-    
-    typeMap.push(cursor.value._resourceType);
-    if (cursor.value._resourceType == "image" && cursor.value.content) {
-        var img = document.createElement("img");
-        if (cursor.value.content.startsWith('data:') || cursor.value.content.startsWith('<?xml')) {
-            img.src = cursor.value.content; // 设置图片源为Base64字符串
-        } else {
-            img.src = "data:image/png;base64," + cursor.value.content; // 设置图片源为Base64字符串
-        }
-        img.alt = "Base64 Image"; // 设置图片的替代文本
-        if (cursor.value.content.startsWith('<?xml')) {
-            row.insertCell().innerHTML = `<div style="max-width: 80px;">${cursor.value.content}</div>`;
-        } else {
-            row.insertCell().innerHTML = `<div style="max-width: 80px;"><img style="max-width: 80px; max-height: 100px;" src="data:image/png;base64,${cursor.value.content}" alt="Base64 Image"></div>`;
-        }
-    } else {
-        row.insertCell().textContent = cursor.value._resourceType;
-    }
-    // row.insertCell().innerHTML  = action();
-
-    lc = lc + 1;
-    var numElement = document.getElementById("num");
-    numElement.innerHTML = lc;
-
-    // 初始化tooltip
-    $(function () {
-        $('[data-toggle="tooltip"]').tooltip({
-            container: "body",
-            height: 100,
         });
     });
 }
@@ -1487,14 +1446,19 @@ function convertTransactionsJson(name,transactions) {
       var item=[]
       let keys = Object.keys(transactions);
       keys.forEach(key => {
-            //求获取过滤类型条件
-            if ((dataType != false  && dataType.includes(transactions[key]._resourceType))||dataType ==false) {
-                if (withRes === true){
-                   transactions[key].content=''
-                }
-                item.push(transactions[key])
+            const transaction = transactions[key];
+            if (!transaction || !transaction.request) {
+                console.warn('Invalid transaction:', key);
+                return;
             }
 
+            //求获取过滤类型条件
+            if ((dataType != false  && dataType.includes(transaction._resourceType))||dataType ==false) {
+                if (withRes === true){
+                    transaction.content=''
+                }
+                item.push(transaction)
+            }
             });
       return item;
     }
@@ -1516,6 +1480,11 @@ function convertTransactionsPostman(name, transactions) {
                 console.warn('Invalid transaction:', key);
                 return;
             }
+            //求获取过滤类型条件
+            if ((dataType != false  && dataType.includes(transaction._resourceType))||dataType ==false) {
+               
+         
+
 
             let requestData = {
                 "name": transaction.api_name || "未命名接口",
@@ -1600,6 +1569,7 @@ function convertTransactionsPostman(name, transactions) {
             }
 
             item.push(requestData);
+        }
         });
 
         data.item = item;
@@ -1640,12 +1610,25 @@ function   convertTransactionsEXCEL(transactions) {
         const deviceList = [
             ["*用例名称", "用例描述", "*请求类型", "请求头参数", "*请求地址", "环境分组", "IP变量名", "请求体类型", "请求体", "检查点匹配方式", "检查点期望值"]
         ];
+        console.log(transactions)
 
         // 处理数据
         for (const key in transactions) {
+            console.log(key)
+            console.log(transactions[key])
+            console.log("")
             const transaction = transactions[key];
+
+            
+
+
             if (!transaction || !transaction.request) continue;
 
+
+                        //求获取过滤类型条件
+            if ((dataType != false  && dataType.includes(transaction._resourceType))||dataType ==false) {
+                
+                       
             // 处理请求头
             let headers = "";
             if (transaction.request.headers && Array.isArray(transaction.request.headers)) {
@@ -1671,11 +1654,13 @@ function   convertTransactionsEXCEL(transactions) {
                         .join("\n");
                 }
             }
-
+            console.log(escapeXml(transaction.api_name))
+            console.log(transaction.api_name)
+            console.log(transaction.api_desc)
             // 构建数据行
             const row = [
                 transaction.api_name || "未命名接口",           // 用例名称
-                transaction.api_desc || "接口测试",             // 用例描述
+                transaction.api_desc  || "接口测试",             // 用例描述
                 transaction.request.method || "GET",           // 请求类型
                 headers,                                      // 请求头参数
                 transaction.request.url || "",                // 请求地址
@@ -1687,6 +1672,7 @@ function   convertTransactionsEXCEL(transactions) {
                 "success"                                     // 检查点期望值
             ];
             deviceList.push(row);
+            }
         }
 
         // 创建工作表
@@ -2270,7 +2256,6 @@ chrome.tabs.onCreated.addListener(function(tab) {
 // 添加更新数据库中API名称的函数
 function updateApiName(recordId, newName) {
 
-    console.log("aaaaaaaaaaaaaaa")
     const request = indexedDB.open("myDatabase", db_version);
     
     request.onsuccess = function(event) {
