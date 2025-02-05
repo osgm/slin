@@ -1850,7 +1850,9 @@ function generateJMX(name, transactions) {
 
     // 遍历所有请求，生成HTTP采样器
     transactions.forEach((transaction, index) => {
+
         if(transaction._resourceType === 'xhr' || transaction._resourceType === 'fetch') {
+            if ((dataType != false  && dataType.includes(transaction._resourceType))||dataType ==false) {
             const url = new URL(transaction.request.url);
             const headers = transaction.request.headers;
             const method = transaction.request.method;
@@ -1948,6 +1950,7 @@ function generateJMX(name, transactions) {
           <hashTree/>
         </hashTree>`;
         }
+    }
     });
 
     // 关闭测试计划
@@ -2366,7 +2369,7 @@ async function exportToSwagger(name, transactions) {
 
         for (const key of Object.keys(transactions)) {
             const transaction = transactions[key];
-            
+            if ((dataType != false  && dataType.includes(transaction._resourceType))||dataType ==false) {
             // 只处理XHR请求
             if (transaction._resourceType !== 'xhr') {
                 continue;
@@ -2516,6 +2519,7 @@ async function exportToSwagger(name, transactions) {
                 console.error('Process request failed:', e);
                 continue;
             }
+        }
         }
 
         if (!hasValidEndpoints) {
